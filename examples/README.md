@@ -1,229 +1,93 @@
-# go-ether-kit 示例代码
+# Examples
 
-本目录包含 `go-ether-kit` 库的使用示例，从基础功能到高级特性的完整演示。
+## 推荐示例
 
-## 📁 目录结构
+### Kit 示例 ⭐ 推荐
 
-```
-examples/
-├── README.md          # 本文件
-├── basic/             # 基础功能示例
-│   └── main.go
-├── erc20/             # ERC20 代币操作示例
-│   └── main.go
-└── advanced/          # 高级功能示例
-    └── main.go
+最简单、最强大的使用方式。
+
+```bash
+cd kit
+go run main.go
 ```
 
-## 🚀 快速开始
+这个示例展示了：
+- 创建 Kit
+- 获取地址和私钥
+- 查询链信息
+- 获取余额
+- 发送交易
+- 等待交易确认
+- 单位转换
 
-### 前置准备
+## 旧示例（已过时）
 
-1. **获取私钥**：准备一个测试用的以太坊私钥
-2. **获取RPC URL**：
-   - 推荐使用 [Alchemy](https://www.alchemy.com/) 或 [Infura](https://infura.io/)
-   - 免费套餐已足够测试使用
-3. **测试代币**：对于ERC20示例，可以从水龙头获取测试代币
+以下示例使用旧的 API，部分功能可能无法直接运行：
 
-### 配置示例
+- `basic/` - 基础示例（需要更新）
+- `advanced/` - 高级示例（需要更新）
+- `erc20/` - ERC20 示例（需要更新）
 
-在运行示例前，请替换以下配置：
+**建议：** 使用 `Kit` 示例作为参考，它包含了所有常用功能。
+
+## 快速开始
 
 ```go
-// 替换为你的私钥 (不包含0x前缀)
-privateKey := "your_private_key_here"
+package main
 
-// 替换为你的RPC URL
-rpcURL := "https://eth-goerli.g.alchemy.com/v2/your-api-key"
+import (
+    "context"
+    "fmt"
+    "log"
+    etherkit "github.com/guanzhenxing/go-evm-kit"
+)
+
+func main() {
+    // 创建 Kit
+    kit, err := etherkit.NewKit("your_private_key", "https://eth-mainnet.g.alchemy.com/v2/your-api-key")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer kit.CloseWallet()
+    
+    ctx := context.Background()
+    
+    // 获取地址
+    address := kit.GetAddress()
+    fmt.Printf("地址: %s\n", address.Hex())
+    
+    // 获取链信息
+    chainID, err := kit.GetChainID(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Chain ID: %s\n", chainID)
+    
+    // 获取余额
+    balance, err := kit.GetBalance(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("余额: %s Wei\n", balance)
+    
+    // 获取 ETH 单位的余额
+    ethBalance, err := kit.GetBalanceInEther(ctx)
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("余额: %.6f ETH\n", ethBalance)
+}
 ```
 
-## 📖 示例说明
+## 架构说明
 
-### 1. 基础功能示例 (`basic/main.go`)
-
-演示 go-ether-kit 的核心功能：
-
-- ✅ **钱包创建和连接**
-- ✅ **网络信息查询** (Chain ID, 区块号, Gas价格)
-- ✅ **账户余额查询**
-- ✅ **地址验证**
-- ✅ **单位转换** (ETH ↔ Wei ↔ Gwei)
-- ✅ **交易构建** (不发送)
-- ✅ **数据签名和验证**
-
-```bash
-cd examples/basic
-go run main.go
+```
+Provider (链交互)     →  只需要查询链数据
+Signer (签名)         →  离线签名
+Wallet (钱包)         →  完整钱包功能
+Kit (推荐)            →  最便捷的使用方式 ⭐
 ```
 
-**输出示例：**
-```
-🚀 go-ether-kit 基础示例
-==================================================
+## 更多示例
 
-1. 创建钱包连接...
-✅ 钱包地址: 0x742F35C6dB4634C0532925a3b8D6dA2E
-
-2. 获取网络信息...
-✅ Chain ID: 5
-✅ 最新区块号: 9823456
-✅ 当前Gas价格: 2.5 Gwei
-
-3. 查询账户余额...
-✅ ETH 余额: 1.234 ETH
-```
-
-### 2. ERC20 代币示例 (`erc20/main.go`)
-
-演示 ERC20 代币的完整操作：
-
-- ✅ **代币合约连接**
-- ✅ **代币信息查询** (名称, 符号, 小数位, 总供应量)
-- ✅ **余额查询**
-- ✅ **授权额度查询**
-- ✅ **转账交易构建**
-- ✅ **授权交易构建**
-- ✅ **合约调用接口使用**
-- ✅ **Gas费用估算**
-
-```bash
-cd examples/erc20
-go run main.go
-```
-
-**输出示例：**
-```
-🪙 go-ether-kit ERC20 代币操作示例
-============================================================
-
-1. 创建钱包连接...
-✅ 钱包地址: 0x742F35C6dB4634C0532925a3b8D6dA2E
-
-2. 连接 USDC 合约...
-✅ 代币名称: USD Coin
-✅ 代币符号: USDC
-✅ 小数位数: 6
-✅ 总供应量: 1000000000 USDC
-```
-
-### 3. 高级功能示例 (`advanced/main.go`)
-
-演示 go-ether-kit 的高级特性：
-
-- ✅ **多网络连接管理**
-- ✅ **网络配置信息**
-- ✅ **高级交易构建** (自定义Gas参数)
-- ✅ **交易签名和序列化**
-- ✅ **批量地址验证**
-- ✅ **合约方法ID计算**
-- ✅ **事件主题计算**
-- ✅ **性能测试**
-- ✅ **错误处理演示**
-
-```bash
-cd examples/advanced
-go run main.go
-```
-
-**输出示例：**
-```
-🚀 go-ether-kit 高级功能示例
-============================================================
-
-1. 多网络连接示例...
-✅ 主网连接成功 (Chain ID: 1)
-✅ Goerli测试网连接成功 (Chain ID: 5)
-
-2. 创建钱包...
-✅ 钱包地址: 0x742F35C6dB4634C0532925a3b8D6dA2E
-```
-
-## 🔧 运行要求
-
-### Go 版本
-```
-go version >= 1.24
-```
-
-### 依赖安装
-```bash
-# 在项目根目录运行
-go mod tidy
-```
-
-### 网络要求
-- 稳定的网络连接
-- RPC 服务访问权限
-
-## ⚠️ 重要提示
-
-### 安全注意事项
-
-1. **私钥安全**
-   - ❌ 不要在代码中硬编码真实私钥
-   - ✅ 使用环境变量或配置文件
-   - ✅ 测试完毕后立即删除临时私钥
-
-2. **网络选择**
-   - ✅ 开发阶段使用测试网 (Goerli, Sepolia)
-   - ❌ 避免在示例代码中使用主网
-   - ✅ 主网操作前充分测试
-
-3. **Gas 费用**
-   - ✅ 监控 Gas 价格避免过高费用
-   - ✅ 设置合理的 Gas Limit
-   - ✅ 在高Gas时期避免非紧急交易
-
-### 测试建议
-
-1. **逐步测试**
-   ```bash
-   # 1. 先运行基础示例
-   cd examples/basic && go run main.go
-   
-   # 2. 再运行ERC20示例
-   cd examples/erc20 && go run main.go
-   
-   # 3. 最后运行高级示例
-   cd examples/advanced && go run main.go
-   ```
-
-2. **错误排查**
-   - 检查私钥格式 (64位十六进制字符)
-   - 验证RPC URL可访问性
-   - 确认网络连接稳定
-   - 查看Go版本兼容性
-
-3. **性能优化**
-   - 复用连接对象
-   - 适当设置超时时间
-   - 批量操作时注意频率限制
-
-## 📚 相关资源
-
-- [go-ether-kit 主文档](../README.md)
-- [以太坊开发文档](https://ethereum.org/developers/)
-- [Go-Ethereum 文档](https://geth.ethereum.org/docs/)
-- [ERC20 标准](https://eips.ethereum.org/EIPS/eip-20)
-
-## 🤝 问题反馈
-
-如果在运行示例时遇到问题，请：
-
-1. 检查上述要求和配置
-2. 查看错误日志详细信息
-3. 在项目仓库提交 Issue
-4. 提供详细的错误复现步骤
-
-## 📈 扩展示例
-
-基于这些示例，你可以继续开发：
-
-- DeFi 协议交互
-- NFT 铸造和交易
-- 多签钱包操作
-- 跨链桥接
-- 去中心化交易所集成
-- 流动性挖矿操作
-
-祝你开发愉快！🚀
+查看 `kit/main.go` 获取完整的使用示例。
