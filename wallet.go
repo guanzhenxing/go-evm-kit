@@ -32,7 +32,7 @@ type EtherWallet interface {
 	SignTx(ctx context.Context, tx *types.Transaction) (*types.Transaction, error)
 	SendSignedTx(ctx context.Context, signedTx *types.Transaction) (common.Hash, error)
 	Signature(data []byte) ([]byte, error)
-	CallContract(ctx context.Context, contractAddress common.Address, contractAbi abi.ABI, functionName string, params ...interface{}) ([]interface{}, error)
+	CallContract(ctx context.Context, blockNumber *big.Int, from *common.Address, value *big.Int, contractAddress common.Address, contractAbi abi.ABI, functionName string, params ...interface{}) ([]interface{}, error)
 }
 
 type Wallet struct {
@@ -237,17 +237,35 @@ func (w *Wallet) Signature(data []byte) ([]byte, error) {
 }
 
 // CallContract 调用合约的方法，无需创建交易
-func (w *Wallet) CallContract(ctx context.Context, contractAddress common.Address, contractAbi abi.ABI, functionName string, params ...interface{}) ([]interface{}, error) {
+// 参数说明：
+//   - blockNumber: 区块号（nil 表示最新区块）
+//   - from: 调用者地址（nil 表示不设置）
+//   - value: 模拟转账金额（nil 表示不转账）
+func (w *Wallet) CallContract(ctx context.Context, blockNumber *big.Int, from *common.Address, value *big.Int, contractAddress common.Address, contractAbi abi.ABI, functionName string, params ...interface{}) ([]interface{}, error) {
 
 	inputData, err := BuildContractInputData(contractAbi, functionName, params...)
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := w.GetClient().CallContract(ctx, ethereum.CallMsg{
+	// 构建 CallMsg
+	callMsg := ethereum.CallMsg{
 		To:   &contractAddress,
 		Data: inputData,
-	}, nil)
+	}
+
+	// 如果指定了 from，则设置
+	if from != nil {
+		callMsg.From = *from
+	}
+
+	// 如果指定了 value，则设置
+	if value != nil {
+		callMsg.Value = value
+	}
+
+	// 执行静态调用（blockNumber 为 nil 表示最新区块）
+	res, err := w.GetClient().CallContract(ctx, callMsg, blockNumber)
 	if err != nil {
 		return nil, err
 	}

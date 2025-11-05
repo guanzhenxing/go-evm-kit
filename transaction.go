@@ -29,14 +29,7 @@ func NewTxWithHexData(to common.Address, nonce, gasLimit uint64, gasPrice, value
 	if err != nil {
 		return nil, err
 	}
-	return types.NewTx(&types.LegacyTx{
-		Nonce:    nonce,
-		To:       &to,
-		Value:    value,
-		Gas:      gasLimit,
-		GasPrice: gasPrice,
-		Data:     data,
-	}), nil
+	return NewTx(to, nonce, gasLimit, gasPrice, value, data)
 }
 
 // DecodeRawTxHex 解析rawTx

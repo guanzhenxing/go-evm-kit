@@ -198,7 +198,8 @@ func callContract(wallet *etherkit.Wallet) {
     }
     
     // 调用合约方法 (只读)
-    result, err := wallet.CallContract(ctx, contractAddress, contractAbi, "totalSupply")
+    // 使用最新区块，不设置 from 和 value
+    result, err := wallet.CallContract(ctx, nil, nil, nil, contractAddress, contractAbi, "totalSupply")
     if err != nil {
         log.Fatal(err)
     }
