@@ -30,6 +30,7 @@ type EtherProvider interface {
 	IsContractAddress(ctx context.Context, address common.Address) (bool, error)
 	EstimateGas(ctx context.Context, from, to common.Address, nonce uint64, gasPrice, value *big.Int, data []byte) (uint64, error)
 	GetFromAddress(tx *types.Transaction) (common.Address, error)
+	FilterLogs(ctx context.Context, contractAddress *common.Address, eventTopic common.Hash, fromBlock, toBlock *big.Int, indexedTopics []common.Hash) ([]types.Log, error)
 }
 
 type Provider struct {
@@ -164,4 +165,47 @@ func (p *Provider) EstimateGas(ctx context.Context, from, to common.Address, non
 // GetFromAddress 获得交易的fromAddress
 func (p *Provider) GetFromAddress(tx *types.Transaction) (common.Address, error) {
 	return types.Sender(types.NewLondonSigner(tx.ChainId()), tx)
+}
+
+// FilterLogs 查询事件日志
+// 用于查询指定区块范围内的事件日志，支持按合约地址、事件签名和 indexed 参数进行过滤
+// 参数说明：
+//   - ctx: 上下文对象
+//   - contractAddress: 合约地址（nil 表示查询所有合约）
+//   - eventTopic: 事件签名 topic（如 GetEventTopic("Transfer(address,address,uint256)")）
+//   - fromBlock: 起始区块号（nil 表示从最新区块开始）
+//   - toBlock: 结束区块号（nil 表示到最新区块）
+//   - indexedTopics: 可选的 indexed 参数过滤（nil 表示不过滤，每个元素对应一个 indexed 参数）
+//
+// 返回：
+//   - []types.Log: 事件日志列表，用户需要自行解析 Data 和 Topics
+//   - error: 如果查询失败则返回错误
+//
+// 使用示例：
+//   - 查询单个合约的事件：FilterLogs(ctx, &contractAddr, topicHash, fromBlock, toBlock, nil)
+//   - 查询所有合约的事件：FilterLogs(ctx, nil, topicHash, fromBlock, toBlock, nil)
+//   - 带 indexed 参数过滤：FilterLogs(ctx, &contractAddr, topicHash, fromBlock, toBlock, []common.Hash{fromAddr.Hash(), toAddr.Hash()})
+func (p *Provider) FilterLogs(ctx context.Context, contractAddress *common.Address, eventTopic common.Hash, fromBlock, toBlock *big.Int, indexedTopics []common.Hash) ([]types.Log, error) {
+	query := ethereum.FilterQuery{
+		FromBlock: fromBlock,
+		ToBlock:   toBlock,
+		Topics: [][]common.Hash{
+			{eventTopic}, // 第一个 topic 是事件签名
+		},
+	}
+
+	// 如果指定了合约地址，则添加到查询条件
+	if contractAddress != nil {
+		query.Addresses = []common.Address{*contractAddress}
+	}
+
+	// 如果有 indexed 参数过滤，添加到 Topics
+	// Topics 的结构：Topics[0] 是事件签名，Topics[1] 是第一个 indexed 参数，Topics[2] 是第二个 indexed 参数，以此类推
+	if len(indexedTopics) > 0 {
+		for _, topic := range indexedTopics {
+			query.Topics = append(query.Topics, []common.Hash{topic})
+		}
+	}
+
+	return p.ec.FilterLogs(ctx, query)
 }

@@ -677,3 +677,47 @@ func (k *Kit) GetNetworkStatus(ctx context.Context) (map[string]interface{}, err
 		"gas_price":    gasPrice,
 	}, nil
 }
+
+// FilterEventLogs 查询合约事件日志（便捷方法）
+// 自动生成事件 topic，简化事件日志查询流程
+// 参数说明：
+//   - ctx: 上下文对象
+//   - contractAddress: 合约地址（nil 表示查询所有合约）
+//   - eventSignature: 事件签名字符串（如 "Transfer(address,address,uint256)" 或 "MarketEntered(address,address)"）
+//   - fromBlock: 起始区块号（nil 表示从最新区块开始）
+//   - toBlock: 结束区块号（nil 表示到最新区块）
+//   - indexedParams: 可选的 indexed 参数值（用于过滤，nil 表示不过滤）
+//     每个元素对应事件签名中的一个 indexed 参数，例如：
+//   - Transfer(from, to, value) 中 from 和 to 是 indexed，可以传入 []common.Hash{fromAddr.Hash(), toAddr.Hash()}
+//   - MarketEntered(cToken, account) 中两个都是 indexed，可以传入 []common.Hash{cTokenAddr.Hash(), accountAddr.Hash()}
+//
+// 返回：
+//   - []types.Log: 事件日志列表，用户需要自行解析 Data 和 Topics
+//   - error: 如果查询失败则返回错误
+//
+// 使用示例：
+//   - 查询单个合约的事件（不过滤 indexed 参数）：
+//     logs, err := kit.FilterEventLogs(ctx, &contractAddr, "MarketEntered(address,address)", fromBlock, toBlock, nil)
+//   - 查询所有合约的事件：
+//     logs, err := kit.FilterEventLogs(ctx, nil, "Transfer(address,address,uint256)", fromBlock, toBlock, nil)
+//   - 带 indexed 参数过滤：
+//     logs, err := kit.FilterEventLogs(ctx, &contractAddr, "Transfer(address,address,uint256)", fromBlock, toBlock, []common.Hash{fromAddr.Hash(), toAddr.Hash()})
+//
+// 注意：
+//   - 返回的日志需要用户自行解析，因为不同事件的数据结构不同
+//   - 解析示例（以 MarketEntered(address,address) 为例）：
+//     for _, vLog := range logs {
+//     if len(vLog.Data) >= 64 {
+//     accountBytes := vLog.Data[32:64] // 第二个 address 是 account
+//     accountAddr := common.BytesToAddress(accountBytes)
+//     // 处理 accountAddr...
+//     }
+//     }
+func (k *Kit) FilterEventLogs(ctx context.Context, contractAddress *common.Address, eventSignature string, fromBlock, toBlock *big.Int, indexedParams []common.Hash) ([]types.Log, error) {
+	// 生成事件 topic
+	eventTopicStr := GetEventTopic(eventSignature)
+	eventTopic := common.HexToHash(eventTopicStr)
+
+	// 调用 Provider 的 FilterLogs 方法
+	return k.EtherProvider.FilterLogs(ctx, contractAddress, eventTopic, fromBlock, toBlock, indexedParams)
+}
