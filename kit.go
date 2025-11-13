@@ -15,8 +15,6 @@ import (
 
 // Kit 相关常量
 const (
-	// GweiDecimals Gwei 的小数位数
-	GweiDecimals = 9
 	// DefaultWaitInterval 默认等待交易确认的轮询间隔
 	DefaultWaitInterval = time.Second
 )
@@ -167,28 +165,6 @@ func (k *Kit) SendTxAndWait(ctx context.Context, to common.Address, nonce, gasLi
 	return k.WaitForReceipt(ctx, txHash, timeout)
 }
 
-// GetBalanceInEther 获取以太币余额（以 ETH 为单位）
-// 将 Wei 余额转换为 ETH，保留小数精度
-// 参数说明：
-//   - ctx: 上下文对象
-//
-// 返回：
-//   - float64: 余额（以 ETH 为单位，如 1.5 表示 1.5 ETH）
-//   - error: 如果查询失败或转换失败则返回错误
-func (k *Kit) GetBalanceInEther(ctx context.Context) (float64, error) {
-	balance, err := k.GetBalance(ctx)
-	if err != nil {
-		return 0, err
-	}
-	// 使用 ToDecimal 转换，以太币的 decimals 是 18
-	ethBalance := ToDecimal(balance, EthDecimals)
-	result, ok := ethBalance.Float64()
-	if !ok {
-		return 0, errors.New("failed to convert balance to float64")
-	}
-	return result, nil
-}
-
 // TransferEther 转账以太币（便捷方法）
 // 将 ETH 金额转换为 Wei 并发送交易，自动计算 nonce、gasLimit 和 gasPrice
 // 参数说明：
@@ -213,35 +189,6 @@ func (k *Kit) TransferEther(ctx context.Context, to common.Address, valueInEther
 	// 使用 ToWei 转换，以太币的 decimals 是 18
 	value := ToWei(valueInEther, EthDecimals)
 	return k.SendTx(ctx, to, 0, 0, nil, value, nil)
-}
-
-// GetChainInfo 获取链信息（便捷方法）
-// 一次性获取链 ID、网络 ID 和当前区块号
-// 参数说明：
-//   - ctx: 上下文对象
-//
-// 返回：
-//   - chainID: 链 ID
-//   - networkID: 网络 ID
-//   - blockNumber: 当前区块号
-//   - error: 如果查询失败则返回错误
-func (k *Kit) GetChainInfo(ctx context.Context) (chainID, networkID, blockNumber *big.Int, err error) {
-	chainID, err = k.GetChainID(ctx)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	networkID, err = k.GetNetworkID(ctx)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	blockNum, err := k.GetBlockNumber(ctx)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return chainID, networkID, big.NewInt(int64(blockNum)), nil
 }
 
 // ============ 便捷的合约交互方法 ============
@@ -520,53 +467,6 @@ func (k *Kit) GetLatestBlock(ctx context.Context) (*types.Block, error) {
 	return k.GetBlockByNumber(ctx, big.NewInt(int64(blockNumber)))
 }
 
-// ============ Gas 和费用相关增强方法 ============
-
-// GetSuggestedGasPriceInGwei 获取建议的 Gas 价格（以 Gwei 为单位）
-// 将网络建议的 Gas 价格从 Wei 转换为 Gwei，便于阅读和使用
-// 参数说明：
-//   - ctx: 上下文对象
-//
-// 返回：
-//   - float64: Gas 价格（以 Gwei 为单位，如 20.5 表示 20.5 Gwei）
-//   - error: 如果查询失败或转换失败则返回错误
-func (k *Kit) GetSuggestedGasPriceInGwei(ctx context.Context) (float64, error) {
-	gasPrice, err := k.GetSuggestGasPrice(ctx)
-	if err != nil {
-		return 0, err
-	}
-	// 1 Gwei = 10^9 Wei
-	gweiPrice := ToDecimal(gasPrice, GweiDecimals)
-	result, ok := gweiPrice.Float64()
-	if !ok {
-		return 0, errors.New("failed to convert gas price to float64")
-	}
-	return result, nil
-}
-
-// EstimateGasForTransfer 估算以太币转账的 Gas
-// 估算一笔以太币转账交易所需的 Gas 数量
-// 参数说明：
-//   - ctx: 上下文对象
-//   - to: 接收地址
-//   - valueInEther: 转账金额（以 ETH 为单位，如 0.1 表示 0.1 ETH）
-//
-// 返回：
-//   - uint64: 估算的 Gas 数量
-//   - error: 如果估算失败则返回错误
-func (k *Kit) EstimateGasForTransfer(ctx context.Context, to common.Address, valueInEther float64) (uint64, error) {
-	// 输入验证
-	if !IsValidAddress(to) {
-		return 0, errors.New("invalid receiver address")
-	}
-	if valueInEther < 0 {
-		return 0, errors.New("transfer amount cannot be negative")
-	}
-
-	value := ToWei(valueInEther, EthDecimals)
-	return k.EstimateGas(ctx, k.GetAddress(), to, 0, nil, value, nil)
-}
-
 // ============ 签名和验证增强方法 ============
 
 // SignMessage 对消息进行签名
@@ -593,89 +493,6 @@ func (k *Kit) SignMessage(ctx context.Context, message []byte) ([]byte, error) {
 //   - bool: true 表示签名有效，false 表示签名无效
 func (k *Kit) VerifyMessage(ctx context.Context, message, signature []byte) bool {
 	return VerifySignature(k.GetAddress().Hex(), message, signature)
-}
-
-// ============ 钱包管理增强方法 ============
-
-// GetBalanceInGwei 获取余额（以 Gwei 为单位）
-// 将 Wei 余额转换为 Gwei，保留小数精度
-// 参数说明：
-//   - ctx: 上下文对象
-//
-// 返回：
-//   - float64: 余额（以 Gwei 为单位，如 1000000.5 表示 1000000.5 Gwei）
-//   - error: 如果查询失败或转换失败则返回错误
-func (k *Kit) GetBalanceInGwei(ctx context.Context) (float64, error) {
-	balance, err := k.GetBalance(ctx)
-	if err != nil {
-		return 0, err
-	}
-	gweiBalance := ToDecimal(balance, GweiDecimals)
-	result, ok := gweiBalance.Float64()
-	if !ok {
-		return 0, errors.New("failed to convert balance to float64")
-	}
-	return result, nil
-}
-
-// GetFormattedBalance 获取格式化的余额字符串
-// 将余额格式化为易读的字符串，显示全部有效数字，并添加 " ETH" 后缀
-// 参数说明：
-//   - ctx: 上下文对象
-//
-// 返回：
-//   - string: 格式化的余额字符串（如 "1.234567890123456789 ETH"）
-//   - error: 如果查询失败则返回错误
-func (k *Kit) GetFormattedBalance(ctx context.Context) (string, error) {
-	balance, err := k.GetBalance(ctx)
-	if err != nil {
-		return "", err
-	}
-	ethBalance := ToDecimal(balance, EthDecimals)
-	return ethBalance.String() + " ETH", nil
-}
-
-// ============ 网络状态增强方法 ============
-
-// GetNetworkStatus 获取网络状态信息
-// 一次性获取链 ID、网络 ID、当前区块号和 Gas 价格等网络状态信息
-// 参数说明：
-//   - ctx: 上下文对象
-//
-// 返回：
-//   - map[string]interface{}: 网络状态信息，包含以下键：
-//   - "chain_id": 链 ID (*big.Int)
-//   - "network_id": 网络 ID (*big.Int)
-//   - "block_number": 当前区块号 (uint64)
-//   - "gas_price": Gas 价格 (*big.Int，单位为 Wei)
-//   - error: 如果查询失败则返回错误
-func (k *Kit) GetNetworkStatus(ctx context.Context) (map[string]interface{}, error) {
-	chainID, err := k.GetChainID(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	networkID, err := k.GetNetworkID(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	blockNumber, err := k.GetBlockNumber(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	gasPrice, err := k.GetSuggestGasPrice(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return map[string]interface{}{
-		"chain_id":     chainID,
-		"network_id":   networkID,
-		"block_number": blockNumber,
-		"gas_price":    gasPrice,
-	}, nil
 }
 
 // FilterEventLogs 查询合约事件日志（便捷方法）
